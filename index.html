@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Лабораторная работа — проверка точки</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="script.js" defer></script>
+</head>
+<body>
+    <header id="header">
+        <h1>Lab1</h1>
+        <p>ФИО: Жамбусинов Марк Ильясович · Группа: P3230 · Вариант: 22713</p>
+    </header>
+    <main>
+        <div class="workspace">
+            <section class="panel graph">
+                <h2>Координатная плоскость</h2>
+                <canvas id="canvas" width="440" height="440">
+                <p id="graph-info">Для примера показан радиус R = 3.</p>
+                <p class="hint">Зелёная точка — попадание, красная — промах. Показана последняя проверенная точка и её радиус.</p>
+            </section>
+            <section class="panel">
+                <h2>Введите координаты</h2>
+                <form id="point-form" novalidate>
+                    <fieldset>
+                        <legend>Координата X</legend>
+                        <div class="radio-list">
+                            <label><input type="radio" name="x" value="-2">−2</label>
+                            <label><input type="radio" name="x" value="-1.5">−1,5</label>
+                            <label><input type="radio" name="x" value="-1">−1</label>
+                            <label><input type="radio" name="x" value="-0.5">−0,5</label>
+                            <label><input type="radio" name="x" value="0">0</label>
+                            <label><input type="radio" name="x" value="0.5">0,5</label>
+                            <label><input type="radio" name="x" value="1">1</label>
+                            <label><input type="radio" name="x" value="1.5">1,5</label>
+                            <label><input type="radio" name="x" value="2">2</label>
+                        </div>
+                    </fieldset>
+                    <div class="field">
+                        <label for="y">Координата Y (−5 &lt; Y &lt; 3)</label>
+                        <input id="y" type="text" inputmode="decimal" placeholder="Например: −1,5" maxlength="40">
+                    </div>
+                    <div class="field">
+                        <label for="r">Радиус R (2 &lt; R &lt; 5)</label>
+                        <input id="r" type="text" inputmode="decimal" placeholder="Например: 3" maxlength="40">
+                    </div>
+                    <p class="hint">Дробную часть можно отделять точкой или запятой. Границы интервалов Y и R не включены.</p>
+                    <button type="submit">Проверить точку</button>
+                    <p id="error" role="alert"></p>
+                    <p id="result" role="status"></p>
+                </form>
+            </section>
+        </div>
+        <section class="panel history">
+            <h2>Результаты проверок</h2>
+            <p id="storage-message" role="status"></p>
+            <div class="table-wrapper">
+                <table>
+                    <thead><tr><th scope="col">X</th><th scope="col">Y</th><th scope="col">R</th><th scope="col">Результат</th><th scope="col">Дата и время</th></tr></thead>
+                    <tbody id="results-body"></tbody>
+                </table>
+            </div>
+        </section>
+    </main>
+</body>
+</html>

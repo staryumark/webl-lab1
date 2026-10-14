@@ -1,0 +1,56 @@
+/* Цвет и шрифт наследуются дочерними элементами. */
+body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+    color: #263345;
+    background: #f2f5f8;
+}
+* { box-sizing: border-box; }
+/* Селектор идентификатора. */
+#header {
+    padding: 24px;
+    font-family: sans-serif;
+    font-size: 18px;
+    color: #203b59;
+    background: #e0ebf6;
+    border-bottom: 2px solid #b9ccdf;
+}
+/* Селектор потомка. */
+#header h1 { margin: 0 0 12px; font-size: 26px; }
+#header p { margin: 0; line-height: 1.6; }
+main { max-width: 1100px; margin: 24px auto; padding: 0 16px; }
+.workspace { display: flex; flex-wrap: wrap; gap: 20px; align-items: stretch; }
+.panel { background: white; border: 1px solid #d2dbe5; border-radius: 8px; padding: 20px; }
+.workspace > .panel { flex: 1; min-width: 280px; }
+/* Селектор дочернего элемента. */
+.panel > h2 { margin: 0 0 20px; font-size: 20px; }
+/* Селектор псевдоэлемента. */
+.panel > h2::after { content: ""; display: block; width: 44px; height: 3px; background: #3288ce; margin-top: 10px; }
+canvas { display: block; width: 100%; max-width: 440px; height: auto; margin: 0 auto; }
+fieldset { border: 1px solid #c4d0dd; margin: 0 0 20px; padding: 12px; }
+.radio-list { display: flex; flex-wrap: wrap; gap: 12px; }
+.radio-list label { display: inline-flex; align-items: center; }
+input[type="radio"] { margin: 4px 6px 4px 0; }
+.field { margin-bottom: 18px; }
+.field > label { display: block; margin-bottom: 8px; }
+input[type="text"] { width: 100%; padding: 10px 12px; margin: 0; border: 1px solid #97a9ba; border-radius: 4px; font: inherit; }
+button { padding: 12px 20px; margin: 8px 0; border: 0; border-radius: 4px; background: #246ba4; color: white; font: inherit; cursor: pointer; }
+button:hover { background: #195584; }
+input:focus-visible, button:focus-visible { outline: 3px solid #e6a42e; outline-offset: 3px; }
+/* Каскад: более позднее правило меняет размер, оставляя цвет предыдущего. */
+.hint { color: #5a6877; font-size: 16px; line-height: 1.5; }
+.hint { font-size: 14px; }
+#error { color: #af2435; min-height: 24px; }
+#result { font-weight: bold; }
+#storage-message { color: #9c4420; }
+.history { margin-top: 20px; }
+.table-wrapper { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; }
+th, td { border: 1px solid #d2dbe5; padding: 10px; text-align: center; }
+th { background: #eaf1f8; }
+tbody tr:nth-child(even) { background: #f6f8fa; }
+@media (max-width: 600px) {
+    #header { padding: 18px; }
+    #header h1 { font-size: 22px; }
+    .panel { padding: 14px; }
+}
