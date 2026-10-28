@@ -5,26 +5,65 @@ const tableBody = document.getElementById('results-body');
 const error = document.getElementById('error');
 const storageMessage = document.getElementById('storage-message');
 const storageKey = 'point-check-lab-v1';
-const xValues = [-2, -1.5, -1, -0.5, 0, 0.5, 1, 1.5, 2];
+const canvasSize = 440;
+// X сверяем строкой
+const xValues = ['-2', '-1.5', '-1', '-0.5', '0', '0.5', '1', '1.5', '2'];
+const maxInputLength = 40;
 let results = [];
 
-// Принимаем обычные десятичные числа
-function readNumber(text) {
+//"2.5" -> { int: 25n, scale: 1 }
+function parseDecimal(text) {
+    if (typeof text !== 'string') return null;
     const value = text.trim().replace(',', '.');
-    if (!/^[+-]?(\d+(\.\d*)?|\.\d+)$/.test(value)) {
-        return NaN;
-    }
-    return Number(value);
+    const match = /^([+-]?)(?:(\d+)(?:\.(\d*))?|\.(\d+))$/.exec(value);
+    if (!match) return null;
+    const sign = match[1] === '-' ? -1n : 1n;
+    const intPart = match[2] || '0';
+    const fracPart = (match[3] !== undefined ? match[3] : match[4]) || '';
+    return { int: sign * BigInt(intPart + fracPart), scale: fracPart.length };
 }
 
-function isHit(x, y, r) {
-    const triangle = x <= 0 && y >= 0 && y <= x + r / 2;
-    const circle = x >= 0 && y >= 0 && x * x + y * y <= r * r / 4;
-    const rectangle = x >= 0 && x <= r && y <= 0 && y >= -r / 2;
+function align(a, b) {
+    const scale = Math.max(a.scale, b.scale);
+    return [
+        a.int * 10n ** BigInt(scale - a.scale),
+        b.int * 10n ** BigInt(scale - b.scale)
+    ];
+}
+
+function compare(a, b) {
+    const [x, y] = align(a, b);
+    return x < y ? -1 : x > y ? 1 : 0;
+}
+
+function formatDecimal(d) {
+    const digits = (d.int < 0n ? -d.int : d.int).toString().padStart(d.scale + 1, '0');
+    const intPart = digits.slice(0, digits.length - d.scale);
+    const fracPart = digits.slice(digits.length - d.scale).replace(/0+$/, '');
+    const text = intPart + (fracPart ? '.' + fracPart : '');
+    return (d.int < 0n ? '-' : '') + text;
+}
+
+const Y_MIN = parseDecimal('-5');
+const Y_MAX = parseDecimal('3');
+const R_MIN = parseDecimal('2');
+const R_MAX = parseDecimal('5');
+
+function inOpenRange(value, min, max) {
+    return compare(value, min) > 0 && compare(value, max) < 0;
+}
+
+//2y <= 2x + R, 4(x² + y²) <= R², 2y >= -R
+function isHit(xd, yd, rd) {
+    const scale = Math.max(xd.scale, yd.scale, rd.scale);
+    const up = function (d) { return d.int * 10n ** BigInt(scale - d.scale); };
+    const x = up(xd), y = up(yd), r = up(rd);
+    const triangle = x <= 0n && y >= 0n && 2n * y <= 2n * x + r;
+    const circle = x >= 0n && y >= 0n && 4n * (x * x + y * y) <= r * r;
+    const rectangle = x >= 0n && x <= r && y <= 0n && 2n * y >= -r;
     return triangle || circle || rectangle;
 }
 
-// Момент времени
 function formatDate(timestamp) {
     return new Date(timestamp).toLocaleString('ru-RU', {
         day: '2-digit', month: '2-digit', year: 'numeric',
@@ -52,6 +91,8 @@ function renderTable() {
 }
 
 function drawCanvas(r, point) {
+    canvas.width = canvasSize;
+    canvas.height = canvasSize;
     const center = 220;
     const scale = 36;
     const size = r * scale;
@@ -85,7 +126,7 @@ function drawCanvas(r, point) {
     ctx.fillText('y', center + 8, 18);
     ctx.fillText('0', center - 14, center + 16);
     const marks = [-r, -r / 2, r / 2, r];
-    const labels = ['−R', '−R/2', 'R/2', 'R'];
+    const labels = marks.map(formatLabel);
     marks.forEach(function (value, index) {
         const px = center + value * scale;
         const py = center - value * scale;
@@ -100,7 +141,7 @@ function drawCanvas(r, point) {
     });
     if (point) {
         ctx.beginPath();
-        ctx.arc(center + point.x * scale, center - point.y * scale, 5, 0, Math.PI * 2);
+        ctx.arc(center + Number(point.x) * scale, center - Number(point.y) * scale, 5, 0, Math.PI * 2);
         ctx.fillStyle = point.hit ? '#16813c' : '#cb2538';
         ctx.fill();
         ctx.strokeStyle = '#ffffff';
@@ -109,50 +150,91 @@ function drawCanvas(r, point) {
     }
 }
 
+function formatLabel(value) {
+    return String(Number(value.toFixed(3))).replace('-', '−');
+}
+
 function showPoint(item) {
-    drawCanvas(item.r, item);
+    drawCanvas(Number(item.r), item);
     document.getElementById('graph-info').textContent = 'Последняя проверка: X = ' + item.x + ', Y = ' + item.y + ', R = ' + item.r;
 }
 
-// Localstorage могло быть изменено
-function validSavedResult(item) {
-    return item !== null && typeof item === 'object' &&
-        xValues.includes(item.x) && Number.isFinite(item.y) && item.y > -5 && item.y < 3 &&
-        Number.isFinite(item.r) && item.r > 2 && item.r < 5 &&
-        Number.isFinite(item.timestamp) && !Number.isNaN(new Date(item.timestamp).getTime());
+// LocalStorage можно изменить вручную
+function restoreSavedResult(item) {
+    if (item === null || typeof item !== 'object') return null;
+    const xText = typeof item.x === 'number' ? String(item.x) : item.x;
+    const yText = typeof item.y === 'number' ? String(item.y) : item.y;
+    const rText = typeof item.r === 'number' ? String(item.r) : item.r;
+    if (typeof xText !== 'string' || !xValues.includes(xText)) return null;
+    const x = parseDecimal(xText);
+    const y = parseDecimal(yText);
+    const r = parseDecimal(rText);
+    if (!y || !inOpenRange(y, Y_MIN, Y_MAX)) return null;
+    if (!r || !inOpenRange(r, R_MIN, R_MAX)) return null;
+    if (!Number.isFinite(item.timestamp) || Number.isNaN(new Date(item.timestamp).getTime())) return null;
+    return {
+        x: xText, y: formatDecimal(y), r: formatDecimal(r),
+        hit: isHit(x, y, r), timestamp: item.timestamp
+    };
 }
 
 try {
     const saved = JSON.parse(localStorage.getItem(storageKey) || '[]');
     if (!Array.isArray(saved)) throw new Error('Некорректная история');
-    results = saved.filter(validSavedResult);
-    results.forEach(function (item) { item.hit = isHit(item.x, item.y, item.r); });
+    results = saved.map(restoreSavedResult).filter(function (item) { return item !== null; });
     if (results.length !== saved.length) storageMessage.textContent = 'Некорректные записи истории пропущены.';
 } catch (e) {
     storageMessage.textContent = 'Не удалось прочитать историю. Возможно, браузер запретил LocalStorage.';
 }
 renderTable();
-if (results.length > 0) showPoint(results[results.length - 1]);
-else drawCanvas(3, null);
+function showLastState() {
+    if (results.length > 0) showPoint(results[results.length - 1]);
+    else {
+        drawCanvas(3, null);
+        document.getElementById('graph-info').textContent = 'Для примера показан радиус R = 3.';
+    }
+}
+showLastState();
+
+// При вводе корректного R график сразу перерисовывается под него
+document.getElementById('r').addEventListener('input', function () {
+    const r = parseDecimal(this.value);
+    if (!r || !inOpenRange(r, R_MIN, R_MAX)) {
+        showLastState();
+        return;
+    }
+    const rText = formatDecimal(r);
+    const last = results[results.length - 1];
+    drawCanvas(Number(rText), last && last.r === rText ? last : null);
+    document.getElementById('graph-info').textContent = 'Область для R = ' + rText;
+});
 
 form.addEventListener('submit', function (event) {
     event.preventDefault();
     error.textContent = '';
     document.getElementById('result').textContent = '';
-    const selectedX = document.querySelector('input[name="x"]:checked');
-    const yText = document.getElementById('y').value;
-    const rText = document.getElementById('r').value;
-    const x = selectedX ? Number(selectedX.value) : NaN;
-    const y = readNumber(yText);
-    const r = readNumber(rText);
-    if (!xValues.includes(x)) { error.textContent = 'Выберите X.'; return; }
+    const checked = form.querySelectorAll('input[type="radio"][name="x"]:checked');
+    const xText = checked.length === 1 ? checked[0].value : '';
+    const yText = String(document.getElementById('y').value);
+    const rText = String(document.getElementById('r').value);
+
+    if (!xValues.includes(xText)) { error.textContent = 'Выберите X из предложенных значений.'; return; }
     if (!yText.trim()) { error.textContent = 'Введите Y.'; return; }
-    if (!Number.isFinite(y)) { error.textContent = 'Y должно быть обычным десятичным числом.'; return; }
-    if (y <= -5 || y >= 3) { error.textContent = 'Y должно быть больше −5 и меньше 3.'; return; }
+    if (yText.length > maxInputLength) { error.textContent = 'Y слишком длинное (не больше ' + maxInputLength + ' символов).'; return; }
+    const y = parseDecimal(yText);
+    if (!y) { error.textContent = 'Y должно быть обычным десятичным числом.'; return; }
+    if (!inOpenRange(y, Y_MIN, Y_MAX)) { error.textContent = 'Y должно быть больше −5 и меньше 3.'; return; }
     if (!rText.trim()) { error.textContent = 'Введите R.'; return; }
-    if (!Number.isFinite(r)) { error.textContent = 'R должно быть обычным десятичным числом.'; return; }
-    if (r <= 2 || r >= 5) { error.textContent = 'R должно быть больше 2 и меньше 5.'; return; }
-    const item = { x: x, y: y, r: r, hit: isHit(x, y, r), timestamp: Date.now() };
+    if (rText.length > maxInputLength) { error.textContent = 'R слишком длинное (не больше ' + maxInputLength + ' символов).'; return; }
+    const r = parseDecimal(rText);
+    if (!r) { error.textContent = 'R должно быть обычным десятичным числом.'; return; }
+    if (!inOpenRange(r, R_MIN, R_MAX)) { error.textContent = 'R должно быть больше 2 и меньше 5.'; return; }
+
+    const x = parseDecimal(xText);
+    const item = {
+        x: xText, y: formatDecimal(y), r: formatDecimal(r),
+        hit: isHit(x, y, r), timestamp: Date.now()
+    };
     results.push(item);
     try {
         localStorage.setItem(storageKey, JSON.stringify(results));
@@ -165,7 +247,6 @@ form.addEventListener('submit', function (event) {
     document.getElementById('result').textContent = item.hit ? 'Точка попала в область.' : 'Точка не попала в область.';
 });
 
-// Обновляем время
 let timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 let offset = new Date().getTimezoneOffset();
 function refreshTimezone() {
